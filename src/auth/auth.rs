@@ -65,7 +65,7 @@ pub async fn logout(
         "{}/v2/logout?client_id={}&returnTo={}",
         config.domain(),
         config.client_id(),
-        "http://localhost:3000" // ログアウト後に戻る URL
+        config.fallback_uri(), // ログアウト後に戻る URL
     );
     Ok(Redirect::to(&logout_url).into_response())
 }
