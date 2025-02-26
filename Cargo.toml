@@ -6,7 +6,6 @@ authors = ["Akira Kano <a.kano1101@gmail.com>"]
 
 [dependencies]
 axum = { version = "0.8.1", features = ["macros"] }
-axum-extra = { version = "0.10.0", features = ["cookie", "typed-header"] }
 axum-server = "0.7.1"
 base64-compat = "1.0.0"
 dotenv = "0.15.0"
@@ -17,7 +16,6 @@ tokio = { version = "1.42.0", features = ["full"] }
 tower = { version = "0.4", features = ["make", "util"] }
 reqwest = { version = "0.12.9", features = ["json"] }
 chrono = { version = "0.4.39", features = ["serde"] }
-async-trait = "0.1.83"
 thiserror = "1.0.69"
 headers = "0.4.0"
 http = "1.2.0"
