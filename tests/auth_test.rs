@@ -349,4 +349,76 @@ mod auth_tests {
         // Auth0 側でエラーが発生した場合、500 が返る想定
         assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
     }
+    #[tokio::test]
+    async fn test_auth0_callback_sets_cookies() {
+        let _ = tracing_subscriber::fmt::try_init();
+
+        // WireMock サーバーを起動し、トークンエンドポイントをモック
+        let mock_server = wiremock::MockServer::start().await;
+        wiremock::Mock::given(wiremock::matchers::method("POST"))
+            .and(wiremock::matchers::path("/oauth/token"))
+            .respond_with(
+                wiremock::ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "access_token": "test_access_token",
+            "id_token": "test_id_token",
+            "token_type": "Bearer"
+        })),
+            )
+            .mount(&mock_server)
+            .await;
+
+        // Config をテスト用にセットアップ
+        let mut config = Arc::new(TestConfig::from_env().expect("環境変数が取得できませんでした。"));
+        Arc::make_mut(&mut config).domain = mock_server.uri();
+        Arc::make_mut(&mut config).client_id = "test_client_id".to_string();
+        Arc::make_mut(&mut config).client_secret = "test_client_secret".to_string();
+        Arc::make_mut(&mut config).callback_url = "http://localhost:3000/callback".to_string();
+        Arc::make_mut(&mut config).audience = "test_audience".to_string();
+        Arc::make_mut(&mut config).fallback_uri = "http://localhost:3000".to_string();
+        Arc::make_mut(&mut config).allowed_redirect_uris = vec!["http://localhost:3000".to_string()];
+        Arc::make_mut(&mut config).jwt_secret = "test_secret".to_string();
+        let config: Arc<dyn ConfigGetTrait> = config;
+
+        let app = axum::Router::new()
+            .route("/callback", axum::routing::get(callback))
+            .layer(axum::Extension(config.clone()))
+            .layer(tower_cookies::CookieManagerLayer::new());
+
+        // 有効な state を生成
+        let crypt_state = CryptState::new(config.clone());
+        let valid_encrypted_state = crypt_state.encrypt_state("http://localhost:3000", None)
+            .expect("state の生成に失敗しました。");
+
+        let response = app
+            .oneshot(
+                http::Request::builder()
+                    .uri(&format!("/callback?code=test_auth_code&state={}", valid_encrypted_state))
+                    .method("GET")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // ステータスコードが 303 (SEE OTHER) であることを確認
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+
+        // `Set-Cookie` ヘッダーを取得
+        let cookies: Vec<String> = response
+            .headers()
+            .get_all(header::SET_COOKIE)
+            .iter()
+            .map(|v| v.to_str().unwrap().to_string())
+            .collect();
+
+        // `access_token` と `id_token` が含まれているか確認
+        assert!(
+            cookies.iter().any(|cookie| cookie.starts_with("access_token=")),
+            "access_token が Cookie に設定されていない"
+        );
+        assert!(
+            cookies.iter().any(|cookie| cookie.starts_with("id_token=")),
+            "id_token が Cookie に設定されていない"
+        );
+    }
 }
