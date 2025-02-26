@@ -89,6 +89,7 @@ pub async fn callback(
         .to_string();
 
     if !is_allowed_redirect(&original_redirect_uri, config.allowed_redirect_uris()) {
+        tracing::error!("Unauthorized redirect URI: {}", original_redirect_uri);
         return Err(AppError::BadRequest("Unauthorized redirect URI".into()));
     }
 
