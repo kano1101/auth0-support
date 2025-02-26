@@ -1,1 +1,1 @@
-pub mod claims_trait;
+pub mod traits;

@@ -5,7 +5,7 @@ mod auth_tests {
     use axum::routing::get;
     use axum::{Extension, Router};
     use auth0_support::auth::auth::{callback, login};
-    use auth0_support::traits::claims_trait::ClaimsTrait;
+    use auth0_support::traits::traits::ClaimsTrait;
     use auth0_support::config::config::{TestConfig, ConfigGetTrait};
     use auth0_support::errors::errors::AppError;
     use chrono::Utc;

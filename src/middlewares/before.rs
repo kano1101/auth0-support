@@ -2,7 +2,7 @@ use crate::config::config::ConfigGetTrait;
 use crate::errors::errors::AppError;
 use crate::utils::utils::{decode_id_token, decode_jwt, get_props_for_decode};
 use crate::auth::redirect_to_login::redirect_to_login;
-use crate::traits::claims_trait::ClaimsTrait;
+use crate::traits::traits::ClaimsTrait;
 use axum::{extract::FromRequestParts, http::request::Parts};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use headers::HeaderMap;
@@ -11,17 +11,17 @@ use serde_json::Value;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use serde::de::DeserializeOwned;
-use tower_cookies::Cookies;
-
 pub struct RequireAuthBeforeMiddleware<Claims, Profile> {
     _phantom: std::marker::PhantomData<(Claims, Profile)>,
 }
 
+use tower_cookies::Cookies;
+
 impl<S, Claims, Profile> FromRequestParts<S> for RequireAuthBeforeMiddleware<Claims, Profile>
 where
     S: Send + Sync,
-    Claims: ClaimsTrait + Clone + DeserializeOwned + Send + Sync + 'static,
-    Profile: ClaimsTrait + Clone + DeserializeOwned + Send + Sync + 'static,
+    Claims: Clone + DeserializeOwned + Send + Sync + 'static + ClaimsTrait,
+    Profile: Clone + DeserializeOwned + Send + Sync + 'static,
 {
     type Rejection = AppError;
 
