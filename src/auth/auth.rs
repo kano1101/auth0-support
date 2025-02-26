@@ -87,7 +87,6 @@ pub async fn callback(
         .decrypt_and_verify_state(&params.state) // state を復号
         .unwrap_or_else(|_| config.fallback_uri().to_string()) // エラー時はデフォルト値
         .to_string();
-    println!("Decrypted original_redirect_uri: {}", original_redirect_uri);
 
     if !is_allowed_redirect(&original_redirect_uri, config.allowed_redirect_uris()) {
         return Err(AppError::BadRequest("Unauthorized redirect URI".into()));
