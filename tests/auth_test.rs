@@ -6,7 +6,7 @@ mod auth_tests {
     use axum::{Extension, Router};
     use auth0_support::auth::auth::{callback, login};
     use auth0_support::traits::claims_trait::ClaimsTrait;
-    use auth0_support::config::config::{Config};
+    use auth0_support::config::config::{TestConfig, ConfigGetTrait};
     use auth0_support::errors::errors::AppError;
     use chrono::Utc;
     use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
@@ -78,7 +78,8 @@ mod auth_tests {
     #[tokio::test]
     async fn test_auth0_redirect() {
         let _ = tracing_subscriber::fmt::try_init();
-        let config = Arc::new(Config::from_env().expect("環境変数が取得できませんでした。"));
+        let config = Arc::new(TestConfig::from_env().expect("環境変数が取得できませんでした。"));
+        let config: Arc<dyn ConfigGetTrait> = config;
 
         let app = Router::new()
             .route("/login", get(login))
@@ -103,7 +104,7 @@ mod auth_tests {
         assert!(location_header.is_some(), "Location ヘッダーが設定されていない");
 
         let location = location_header.unwrap().to_str().unwrap();
-        assert!(location.starts_with(&config.auth0_domain()), "リダイレクトURLがAuth0になっていない");
+        assert!(location.starts_with(&config.domain()), "リダイレクトURLがAuth0になっていない");
     }
 
     #[tokio::test]
@@ -150,8 +151,9 @@ mod auth_tests {
         });
 
         // Config をテスト用に上書き
-        std::env::set_var("AUTH0_DOMAIN", format!("http://{}", local_addr));
-        let config = Arc::new(Config::from_env().expect("環境変数の取得に失敗しました。"));
+        let mut config = Arc::new(TestConfig::from_env().expect("環境変数の取得に失敗しました。"));
+        Arc::make_mut(&mut config).domain = format!("http://{}", local_addr);
+        let config: Arc<dyn ConfigGetTrait> = config;
 
         // 有効な state を生成
         let crypt_state = CryptState::new(config.clone());
@@ -195,15 +197,14 @@ mod auth_tests {
             .mount(&mock_server)
             .await;
 
-        // 環境変数をセット
-        std::env::set_var("AUTH0_DOMAIN", &mock_server.uri());
-        std::env::set_var("AUTH0_CLIENT_ID", "test_client_id");
-        std::env::set_var("AUTH0_CLIENT_SECRET", "test_client_secret");
-        std::env::set_var("AUTH0_CALLBACK_URL", "http://localhost:3000/callback");
-        std::env::set_var("AUTH0_AUDIENCE", "test_audience");
-        std::env::set_var("JWT_SECRET", "test_secret");
-
-        let config = Arc::new(Config::from_env().expect("環境変数が取得できませんでした。"));
+        let mut config = Arc::new(TestConfig::from_env().expect("環境変数が取得できませんでした。"));
+        Arc::make_mut(&mut config).domain = mock_server.uri();
+        Arc::make_mut(&mut config).client_id = "test_client_id".to_string();
+        Arc::make_mut(&mut config).client_secret = "test_client_secret".to_string();
+        Arc::make_mut(&mut config).callback_url = "http://localhost:3000/callback".to_string();
+        Arc::make_mut(&mut config).audience = "test_audience".to_string();
+        Arc::make_mut(&mut config).jwt_secret = "test_secret".to_string();
+        let config: Arc<dyn ConfigGetTrait> = config;
 
         let app = Router::new()
             .route("/callback", get(callback))
@@ -226,7 +227,6 @@ mod auth_tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_auth0_callback_invalid_state() {
         let _ = tracing_subscriber::fmt::try_init();
 
@@ -244,23 +244,20 @@ mod auth_tests {
             .mount(&mock_server)
             .await;
 
-        // 環境変数をセット（AUTH0_DOMAIN にモックサーバーの URI を使用）
-        std::env::set_var("AUTH0_DOMAIN", &mock_server.uri());
-        std::env::set_var("AUTH0_CLIENT_ID", "test_client_id");
-        std::env::set_var("AUTH0_CLIENT_SECRET", "test_client_secret");
-        std::env::set_var("AUTH0_CALLBACK_URL", "http://localhost:3000/callback");
-        std::env::set_var("AUTH0_AUDIENCE", "test_audience");
-        std::env::set_var("FALLBACK_URI", "http://localhost:3000");
-        std::env::set_var("ALLOWED_REDIRECT_URIS", "http://localhost:3000");
-        std::env::set_var("JWT_SECRET", "test_secret");
-
-        let config = Arc::new(Config::from_env().expect("環境変数が取得できませんでした。"));
-        println!("ALLOWED_REDIRECT_URIS: {:?}", config.allowed_redirect_uris());
+        let mut config = Arc::new(TestConfig::from_env().expect("環境変数が取得できませんでした。"));
+        Arc::make_mut(&mut config).domain = mock_server.uri();
+        Arc::make_mut(&mut config).client_id = "test_client_id".to_string();
+        Arc::make_mut(&mut config).client_secret = "test_client_secret".to_string();
+        Arc::make_mut(&mut config).callback_url = "http://localhost:3000/callback".to_string();
+        Arc::make_mut(&mut config).audience = "test_audience".to_string();
+        Arc::make_mut(&mut config).fallback_uri = "http://localhost:3000".to_string();
+        Arc::make_mut(&mut config).allowed_redirect_uris = vec!["http://localhost:3000".to_string()];
+        Arc::make_mut(&mut config).jwt_secret = "test_secret".to_string();
+        let config: Arc<dyn ConfigGetTrait> = config;
 
         let app = axum::Router::new()
             .route("/callback", axum::routing::get(callback))
             .layer(axum::Extension(config.clone()))
-            // Cookies の抽出に必要なレイヤーを追加
             .layer(tower_cookies::CookieManagerLayer::new());
 
         let response = app
@@ -279,7 +276,6 @@ mod auth_tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_auth0_callback_unauthorized_redirect_uri() {
         let _ = tracing_subscriber::fmt::try_init();
 
@@ -297,18 +293,16 @@ mod auth_tests {
             .mount(&mock_server)
             .await;
 
-        // 環境変数をセット（`mock_server.uri()` を使用）
-        std::env::set_var("AUTH0_DOMAIN", &mock_server.uri());
-        std::env::set_var("AUTH0_CLIENT_ID", "test_client_id");
-        std::env::set_var("AUTH0_CLIENT_SECRET", "test_client_secret");
-        std::env::set_var("AUTH0_CALLBACK_URL", "http://localhost:3000/callback");
-        std::env::set_var("AUTH0_AUDIENCE", "test_audience");
-        std::env::set_var("JWT_SECRET", "test_secret");
-        std::env::set_var("FALLBACK_URI", "http://localhost:3000");
-        std::env::set_var("ALLOWED_REDIRECT_URIS", "http://unauthorized_redirect_uri");
-        std::env::set_var("TESTING_MODE", "true");
-
-        let config = Arc::new(Config::from_env().expect("環境変数が取得できませんでした。"));
+        let mut config = Arc::new(TestConfig::from_env().expect("環境変数が取得できませんでした。"));
+        Arc::make_mut(&mut config).domain = mock_server.uri();
+        Arc::make_mut(&mut config).client_id = "test_client_id".to_string();
+        Arc::make_mut(&mut config).client_secret = "test_client_secret".to_string();
+        Arc::make_mut(&mut config).callback_url = "http://localhost:3000/callback".to_string();
+        Arc::make_mut(&mut config).audience = "test_audience".to_string();
+        Arc::make_mut(&mut config).jwt_secret = "test_secret".to_string();
+        Arc::make_mut(&mut config).fallback_uri = "http://unauthorized".to_string();
+        Arc::make_mut(&mut config).allowed_redirect_uris = vec!["http://localhost:3000".to_string()];
+        let config: Arc<dyn ConfigGetTrait> = config;
 
         let app = Router::new()
             .route("/callback", get(callback))
@@ -334,7 +328,8 @@ mod auth_tests {
     async fn test_auth0_callback_auth0_token_request_failure() {
         let _ = tracing_subscriber::fmt::try_init();
 
-        let config = Arc::new(Config::from_env().expect("環境変数が取得できませんでした。"));
+        let config = Arc::new(TestConfig::from_env().expect("環境変数が取得できませんでした。"));
+        let config: Arc<dyn ConfigGetTrait> = config;
 
         let app = Router::new()
             .route("/callback", get(callback))

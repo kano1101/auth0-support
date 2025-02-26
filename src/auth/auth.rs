@@ -11,7 +11,7 @@ use crate::auth::crypt::CryptState;
 use crate::errors::errors::AppError;
 use crate::utils::utils::{build_token_request_params, extract_access_token, extract_id_token, handle_token_error, is_allowed_redirect};
 use crate::auth::redirect_to_login::redirect_to_login;
-use crate::config::config::{Config};
+use crate::config::config::{ConfigGetTrait};
 
 // JWTで使用する秘密鍵（本番では環境変数等で安全に管理）
 #[derive(Debug, Deserialize)]
@@ -28,13 +28,13 @@ pub struct LoginParams {
 }
 pub async fn login(
     Query(params): Query<LoginParams>,
-    Extension(config): Extension<Arc<Config>>,
+    Extension(config): Extension<Arc<dyn ConfigGetTrait>>,
 ) -> Result<Response, AppError> {
     tracing::debug!("login called.");
     let original_redirect_uri = params
         .redirect_uri
         .clone()
-        .unwrap_or_else(|| "http://localhost:3000".to_string());
+        .unwrap_or(config.fallback_uri().to_string()); // エラー時はデフォルト値
 
     let response = redirect_to_login(&original_redirect_uri, config);
     tracing::debug!("login returning after login_util::login.");
@@ -42,7 +42,7 @@ pub async fn login(
 }
 pub async fn logout(
     cookies: Cookies,
-    Extension(config): Extension<Arc<Config>>,
+    Extension(config): Extension<Arc<dyn ConfigGetTrait>>,
 ) -> Result<Response, AppError> {
     tracing::debug!("logout called.");
 
@@ -63,7 +63,7 @@ pub async fn logout(
     // returnTo に指定する URL は Auth0 の許可リストに登録されている必要があります
     let logout_url = format!(
         "{}/v2/logout?client_id={}&returnTo={}",
-        config.auth0_domain(),
+        config.domain(),
         config.client_id(),
         "http://localhost:3000" // ログアウト後に戻る URL
     );
@@ -72,7 +72,7 @@ pub async fn logout(
 
 pub async fn callback(
     Query(params): Query<AuthCallbackParams>,
-    Extension(config): Extension<Arc<Config>>,
+    Extension(config): Extension<Arc<dyn ConfigGetTrait>>,
     cookies: Cookies,
 ) -> Result<Response, AppError> {
     tracing::debug!("callback called.");
@@ -87,12 +87,13 @@ pub async fn callback(
         .decrypt_and_verify_state(&params.state) // state を復号
         .unwrap_or_else(|_| config.fallback_uri().to_string()) // エラー時はデフォルト値
         .to_string();
+    println!("Decrypted original_redirect_uri: {}", original_redirect_uri);
 
     if !is_allowed_redirect(&original_redirect_uri, config.allowed_redirect_uris()) {
         return Err(AppError::BadRequest("Unauthorized redirect URI".into()));
     }
 
-    let token_endpoint = format!("{}/oauth/token", config.auth0_domain());
+    let token_endpoint = format!("{}/oauth/token", config.domain());
 
     let token_request_params = build_token_request_params(
         &config.client_id(),
@@ -150,7 +151,7 @@ pub async fn callback(
         (false, false, SameSite::Lax)
     } else {
         tracing::info!("プロダクションモードで実行中");
-        println!("プロダクションモードで実行中");
+        // println!("プロダクションモードで実行中");
         (true, true, SameSite::None)
     };
 

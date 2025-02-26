@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use crate::config::config::Config;
+use crate::config::config::ConfigGetTrait;
 use crate::errors::errors::AppError;
 use crate::utils::jwks::fetch_public_key;
 use jsonwebtoken::{
@@ -60,32 +60,32 @@ pub struct DecodeProps {
     decoding_key: DecodingKey,
     audience: Vec<String>,
     #[allow(dead_code)]
-    auth0_domain: Vec<String>,
+    domain: Vec<String>,
 }
 
 pub async fn get_props_for_decode(
     access_token: &str,
-    config: Arc<Config>,
+    config: Arc<dyn ConfigGetTrait>,
 ) -> Result<DecodeProps, AppError> {
     tracing::trace!("get_props_for_decode called");
     let decoding_key = get_decoding_key(access_token, config.clone()).await?;
     let audience = vec![config.audience().to_string()];
-    let auth0_domain = vec![config.auth0_domain().to_string()];
+    let domain = vec![config.domain().to_string()];
     Ok(DecodeProps {
         decoding_key,
         audience,
-        auth0_domain,
+        domain,
     })
 }
 
-async fn get_decoding_key(access_token: &str, config: Arc<Config>) -> Result<DecodingKey, AppError> {
+async fn get_decoding_key(access_token: &str, config: Arc<dyn ConfigGetTrait>) -> Result<DecodingKey, AppError> {
     tracing::trace!("get_decoding_key called");
     // ここでは公開鍵をあらかじめ取得済みまたはキャッシュ済みと仮定する
     // 本来は Auth0 の JWKS エンドポイントから kid をキーに公開鍵を取得します
     // JWTのヘッダーからkidを抽出
     let kid = extract_kid(access_token)?;
     // 公開鍵を取得（kidに基づいて）
-    let (public_key_n, public_key_e) = fetch_public_key(&config.auth0_domain(), &kid).await?;
+    let (public_key_n, public_key_e) = fetch_public_key(&config.domain(), &kid).await?;
 
     // DecodingKey を生成
     let decoding_key = DecodingKey::from_rsa_components(&public_key_n, &public_key_e)

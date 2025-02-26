@@ -1,5 +1,5 @@
 use crate::errors::errors::AppError;
-use crate::config::config::Config;
+use crate::config::config::ConfigGetTrait;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, TokenData, Validation};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -13,11 +13,11 @@ struct StateClaims {
 }
 
 pub struct CryptState {
-    config: Arc<Config>,
+    config: Arc<dyn ConfigGetTrait>,
 }
 
 impl CryptState {
-    pub fn new(config: Arc<Config>) -> Self {
+    pub fn new(config: Arc<dyn ConfigGetTrait>) -> Self {
         CryptState {
             config,
         }

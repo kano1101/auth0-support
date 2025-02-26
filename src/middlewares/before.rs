@@ -1,4 +1,4 @@
-use crate::config::config::Config;
+use crate::config::config::ConfigGetTrait;
 use crate::errors::errors::AppError;
 use crate::utils::utils::{decode_id_token, decode_jwt, get_props_for_decode};
 use crate::auth::redirect_to_login::redirect_to_login;
@@ -50,13 +50,13 @@ where
             }
             let config = parts
                 .extensions
-                .get::<Arc<Config>>()
+                .get::<Arc<dyn ConfigGetTrait>>()
                 .ok_or_else(|| AppError::Unauthorized("Missing config extension".to_string()))?
                 .clone();
 
             let headers = parts.headers.clone();
 
-            let original_redirect_uri = extract_redirect_uri(&headers);
+            let original_redirect_uri = extract_redirect_uri(&headers, config.clone());
 
             let response = AppError::Redirect(redirect_to_login(&original_redirect_uri, config));
             tracing::debug!(
@@ -68,7 +68,7 @@ where
 
         let config = parts
             .extensions
-            .get::<Arc<Config>>()
+            .get::<Arc<dyn ConfigGetTrait>>()
             .ok_or_else(|| AppError::Unauthorized("Missing config extension".to_string()))?
             .clone();
 
@@ -124,12 +124,12 @@ fn extract_exp_from_jwt(token: &str) -> Option<usize> {
     payload_json.get("exp")?.as_u64().map(|v| v as usize)
 }
 
-fn extract_redirect_uri(headers: &HeaderMap) -> String {
+fn extract_redirect_uri(headers: &HeaderMap, config: Arc<dyn ConfigGetTrait>) -> String {
     headers
         .get(header::REFERER)
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string()) // 末尾の `/` を削除
-        .unwrap_or_else(|| "/".to_string())
+        .unwrap_or(config.fallback_uri().to_string())
 }
 
 fn token_in_cookies_to_string(cookie: tower_cookies::Cookie) -> String {

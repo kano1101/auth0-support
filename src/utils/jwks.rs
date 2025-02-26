@@ -19,8 +19,8 @@ pub struct Jwk {
     pub e: String,          // Exponent
 }
 
-pub async fn fetch_public_key(auth0_domain: &str, kid: &str) -> Result<(String, String), AppError> {
-    let jwks_url = format!("{}/.well-known/jwks.json", auth0_domain);
+pub async fn fetch_public_key(domain: &str, kid: &str) -> Result<(String, String), AppError> {
+    let jwks_url = format!("{}/.well-known/jwks.json", domain);
     let client = Client::new();
     let res = client
         .get(&jwks_url)

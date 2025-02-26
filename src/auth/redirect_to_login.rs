@@ -1,9 +1,9 @@
 use std::sync::Arc;
 use axum::response::Redirect;
 use crate::auth::crypt::CryptState;
-use crate::config::config::Config;
+use crate::config::config::ConfigGetTrait;
 
-pub fn redirect_to_login(original_redirect_uri: &str, config: Arc<Config>) -> Redirect {
+pub fn redirect_to_login(original_redirect_uri: &str, config: Arc<dyn ConfigGetTrait>) -> Redirect {
     tracing::debug!("redirect_to_login called.");
     let exp = (chrono::Utc::now() + chrono::Duration::minutes(5)).timestamp() as usize;
 
@@ -13,7 +13,7 @@ pub fn redirect_to_login(original_redirect_uri: &str, config: Arc<Config>) -> Re
         .expect("Failed to generate state token");
 
     let auth_url = build_auth0_login_url(
-        &config.auth0_domain(),
+        &config.domain(),
         &config.client_id(),
         &config.callback_url(),
         &config.audience(),
