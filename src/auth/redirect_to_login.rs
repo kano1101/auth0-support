@@ -1,9 +1,9 @@
 use std::sync::Arc;
 use axum::response::Redirect;
 use crate::auth::crypt::CryptState;
-use crate::config::config::ConfigGetTrait;
+use crate::config::config::Config;
 
-pub fn redirect_to_login(original_redirect_uri: &str, config: Arc<dyn ConfigGetTrait>) -> Redirect {
+pub fn redirect_to_login(original_redirect_uri: &str, config: Arc<Config>) -> Redirect {
     tracing::debug!("redirect_to_login called.");
     let exp = (chrono::Utc::now() + chrono::Duration::minutes(5)).timestamp() as usize;
 

@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use crate::config::config::ConfigGetTrait;
+use crate::config::config::Config;
 use crate::errors::errors::AppError;
 use crate::utils::jwks::fetch_public_key;
 use jsonwebtoken::{
@@ -65,7 +65,7 @@ pub struct DecodeProps {
 
 pub async fn get_props_for_decode(
     access_token: &str,
-    config: Arc<dyn ConfigGetTrait>,
+    config: Arc<Config>,
 ) -> Result<DecodeProps, AppError> {
     tracing::trace!("get_props_for_decode called");
     let decoding_key = get_decoding_key(access_token, config.clone()).await?;
@@ -78,7 +78,7 @@ pub async fn get_props_for_decode(
     })
 }
 
-async fn get_decoding_key(access_token: &str, config: Arc<dyn ConfigGetTrait>) -> Result<DecodingKey, AppError> {
+async fn get_decoding_key(access_token: &str, config: Arc<Config>) -> Result<DecodingKey, AppError> {
     tracing::trace!("get_decoding_key called");
     // ここでは公開鍵をあらかじめ取得済みまたはキャッシュ済みと仮定する
     // 本来は Auth0 の JWKS エンドポイントから kid をキーに公開鍵を取得します
