@@ -93,7 +93,7 @@ where
         let claims = decode_jwt(&access_token, &decode_props)?;
         let claims: Claims = is_valid_claims(claims).await?;
         // expが期限切れの際はis_valid_claimsの戻り値がErrのためここに到達しない
-        tracing::info!("access_tokenのexpの有効期限に問題ありません。");
+        tracing::debug!("access_tokenのexpの有効期限に問題ありません。");
 
         let maybe_profile = decode_id_token(&id_token, &decode_props);
         let profile: Profile =
